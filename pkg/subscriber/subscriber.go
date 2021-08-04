@@ -43,7 +43,15 @@ func main() {
 		Namespace:  "pubsub",
 		Name:       "latency",
 		Help:       "Cloud Pub/Sub latency in milliseconds",
-		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		Objectives: map[float64]float64{
+			0.5: 0.05,
+			0.9: 0.01,
+			0.99: 0.001,
+			0.999: 0.0001,
+			0.9999: 0.00001,
+			0.99999: 0.000001,
+			0.999999: 0.0000001,
+		},
 	})
 	prometheus.MustRegister(summary)
 
