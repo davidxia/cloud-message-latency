@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	cloud.google.com/go/pubsub v1.13.0
+	github.com/confluentinc/confluent-kafka-go v1.7.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/common v0.30.0 // indirect
