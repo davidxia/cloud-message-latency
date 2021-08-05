@@ -20,7 +20,8 @@ gcloud auth application-default login --account [your@email.com]
 
 ### Golang
 
-Install some decently recent version of [Golang][go-install].
+Install some decently recent version of [Golang][go-install]. You might also need to install a package that provides
+the `gcc` compiler. The build-essential package provides this for Ubuntu/Debian.
 
 
 ## Recommended Usage
@@ -35,8 +36,10 @@ This has to do with how Pub/Sub balances the pull requests between listeners.
 
 ### Publish
 
+#### On Pub/Sub
+
 ```
-bin/publisher \
+bin/pubsub/publisher \
   -projectID warpspeed-testing \
   -topicPrefix dxiatest \
   -testLabelKey dxiatest
@@ -50,6 +53,21 @@ press enter to start publishing messages at 100 RPS...
 ```
 
 See more options with `-h`.
+
+#### On Kafka
+
+```
+bin/kafka/./producer \
+  -brokerHost my-broker.com \
+  -brokerPort 9092 \
+  -topicPrefix dxiatest \
+  -messageSize 100 \
+  -RPS 1000
+
+2021/08/05 20:36:44 created topic dxiatest-1628195803751335869
+press enter to start producing 100 byte messages at 1000 RPS for 5m0s...
+
+```
 
 ### Pull-based Subscribe
 

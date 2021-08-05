@@ -110,7 +110,7 @@ func main() {
 	errorsChan := make(chan bool, 10)
 	counterDone := make(chan bool)
 
-	go counter(counterDone, publishedMsgsChan, errorsChan, publishedMsgs, numErrors)
+	go counter(counterDone, publishedMsgsChan, errorsChan, &publishedMsgs, &numErrors)
 
 	dispatcherDone := make(chan bool)
 	go dispatchPublisher(ctx, topic, dispatcherDone, ticker, *messageSize, publishedMsgsChan, errorsChan)
@@ -207,15 +207,15 @@ func deleteOldResources(ctx context.Context, client *pubsub.Client) {
 	}
 }
 
-func counter(done, publishedMsgsChan, errorsChan chan bool, publishedMsgs, numErrors uint64) {
+func counter(done, publishedMsgsChan, errorsChan chan bool, publishedMsgs, numErrors *uint64) {
 	for {
 		select {
 		case <-done:
 			return
 		case <-publishedMsgsChan:
-			atomic.AddUint64(&publishedMsgs, 1)
+			atomic.AddUint64(publishedMsgs, 1)
 		case <-errorsChan:
-			atomic.AddUint64(&numErrors, 1)
+			atomic.AddUint64(numErrors, 1)
 		}
 	}
 }

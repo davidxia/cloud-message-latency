@@ -56,6 +56,7 @@ func setup() (consumer *kafka.Consumer, err error) {
 			"sasl.mechanisms":   "PLAIN",
 			"sasl.username":     apiKey,
 			"sasl.password":     apiSecret,
+			"client.id":         *topicID,
 		}
 
 		consumer, err = kafka.NewConsumer(conf)

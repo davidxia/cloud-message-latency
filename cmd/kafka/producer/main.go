@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -59,12 +60,15 @@ func setup() (producer *kafka.Producer, err error) {
 		}
 
 		ctx := context.Background()
+		topicID = fmt.Sprintf("%s-%d", *topicPrefix, time.Now().UnixNano())
+
 		conf := &kafka.ConfigMap{
 			"bootstrap.servers": fmt.Sprintf("%s:%d", *brokerHost, *brokerPort),
 			"security.protocol": "SASL_SSL",
 			"sasl.mechanisms":   "PLAIN",
 			"sasl.username":     apiKey,
 			"sasl.password":     apiSecret,
+			"client.id":         topicID,
 		}
 		adminClient, err := kafka.NewAdminClient(conf)
 		if err != nil {
@@ -73,7 +77,6 @@ func setup() (producer *kafka.Producer, err error) {
 
 		deleteOldResources(ctx, adminClient)
 
-		topicID = fmt.Sprintf("%s-%d", *topicPrefix, time.Now().UnixNano())
 		topicsSpec := []kafka.TopicSpecification{
 			{
 				Topic:             topicID,
@@ -112,28 +115,33 @@ func main() {
 	errorsChan := make(chan bool, 10)
 	counterDone := make(chan bool)
 
-	go counter(counterDone, producedMsgsChan, errorsChan, producedMsgs, numErrors)
+	go counter(counterDone, producedMsgsChan, errorsChan, &producedMsgs, &numErrors)
 
 	dispatcherDone := make(chan bool)
-	go dispatchProducer(producer, dispatcherDone, ticker, producedMsgsChan, errorsChan)
+	msg := &kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topicID, Partition: kafka.PartitionAny},
+		Value:          bytes.Repeat([]byte("A"), *messageSize),
+	}
+	go dispatchProducer(producer, dispatcherDone, ticker, msg, producedMsgsChan, errorsChan)
 
 	time.Sleep(*duration)
 	ticker.Stop()
 	counterDone <- true
 	dispatcherDone <- true
+	producer.Flush(1000)
 
 	log.Printf("successfully produced %d messages, failed %d ", producedMsgs, numErrors)
 }
 
-func counter(done, producedMsgsChan, errorsChan chan bool, producedMsgs, numErrors uint64) {
+func counter(done, producedMsgsChan, errorsChan chan bool, producedMsgs, numErrors *uint64) {
 	for {
 		select {
 		case <-done:
 			return
 		case <-producedMsgsChan:
-			atomic.AddUint64(&producedMsgs, 1)
+			atomic.AddUint64(producedMsgs, 1)
 		case <-errorsChan:
-			atomic.AddUint64(&numErrors, 1)
+			atomic.AddUint64(numErrors, 1)
 		}
 	}
 }
@@ -178,39 +186,23 @@ func deleteOldResources(ctx context.Context, adminClient *kafka.AdminClient) {
 	}
 }
 
-func dispatchProducer(producer *kafka.Producer, done chan bool, ticker *time.Ticker, producedMsgsChan, numErrsChan chan bool) {
+func dispatchProducer(producer *kafka.Producer, done chan bool, ticker *time.Ticker, msg *kafka.Message, producedMsgsChan, numErrsChan chan bool) {
 	for {
 		select {
 		case <-done:
 			return
 		case <-ticker.C:
-			go produce(producer, producedMsgsChan, numErrsChan)
+			// produce messages to topic (asynchronously)
+			go produce(producer, msg, producedMsgsChan, numErrsChan)
 		}
 	}
 }
 
-func produce(producer *kafka.Producer, producedMsgsChan, numErrsChan chan bool) {
-	// Produce messages to topic (asynchronously)
-	for _, word := range []string{"Welcome", "to", "the", "Confluent", "Kafka", "Golang", "client"} {
-		if err := producer.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topicID, Partition: kafka.PartitionAny},
-			Value:          []byte(word),
-		}, nil); err != nil {
-			log.Printf("error producing message: %s", err)
-			numErrsChan <- true
-		} else {
-			log.Printf("published %s", word)
-			producedMsgsChan <- true
-		}
+func produce(producer *kafka.Producer, msg *kafka.Message, producedMsgsChan, numErrsChan chan bool) {
+	if err := producer.Produce(msg, nil); err != nil {
+		log.Printf("error producing message: %s", err)
+		numErrsChan <- true
+	} else {
+		producedMsgsChan <- true
 	}
-	//attrs := map[string]string{
-	//	// The pt attribute is the production time in nanoseconds since epoch.
-	//	"pt": strconv.FormatInt(time.Now().UnixNano(), 10),
-	//}
-	//data := bytes.Repeat([]byte("A"), int(math.Max(float64(msgSize-int(unsafe.Sizeof(attrs))-25), 1)))
-	//msg := pubsub.Message{
-	//	Data:       data,
-	//	Attributes: attrs,
-	//}
-
 }
