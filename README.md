@@ -26,6 +26,7 @@ Install some decently recent version of [Golang][go-install].
 ## Recommended Usage
 
 * Use separate machines for load generation and consumption.
+* Run `scripts/./install.sh` to compile Go binaries. Default target OS is `darwin`. You can change to others like `linux`.
 
 ### Google Cloud Pub/Sub
 
@@ -35,7 +36,7 @@ This has to do with how Pub/Sub balances the pull requests between listeners.
 ### Publish
 
 ```
-go run publisher.go \
+bin/publisher \
   -projectID warpspeed-testing \
   -topicPrefix dxiatest \
   -testLabelKey dxiatest
@@ -53,7 +54,7 @@ See more options with `-h`.
 ### Pull-based Subscribe
 
 ```
-go run subscriber.go \
+bin/subscriber \
   -projectID warpspeed-testing \
   -subscriptionID dxiatest-1627601318562471531
 
