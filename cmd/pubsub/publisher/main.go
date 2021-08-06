@@ -10,7 +10,6 @@ import (
 	"log"
 	"math"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -24,14 +23,6 @@ const (
 	defaultResourceExpiry = 1 * time.Hour
 	defaultTestLabelKey   = "test"
 	defaultMessageSize    = 1e2
-)
-
-// once guards cleanup related operations in setup. No need to set up and tear
-// down every time, so this speeds things up.
-var (
-	once           sync.Once
-	topicID        string
-	subscriptionID string
 )
 
 var (
@@ -48,28 +39,24 @@ func init() {
 	flag.Parse()
 }
 
-func setup() *pubsub.Client {
-	var client *pubsub.Client
+func setup() (*pubsub.Client, string) {
+	ctx := context.Background()
 
-	once.Do(func() {
-		ctx := context.Background()
+	client, err := pubsub.NewClient(ctx, *projectID)
+	if err != nil {
+		log.Fatalf("failed to create client: %s", err)
+	}
+	topicID := fmt.Sprintf("%s-%d", *topicPrefix, time.Now().UnixNano())
 
-		client, err := pubsub.NewClient(ctx, *projectID)
-		if err != nil {
-			log.Fatalf("failed to create client: %s", err)
-		}
-		topicID = fmt.Sprintf("%s-%d", *topicPrefix, time.Now().UnixNano())
-		subscriptionID = topicID
+	deleteOldResources(ctx, client)
 
-		deleteOldResources(ctx, client)
-	})
-
-	return client
+	return client, topicID
 }
 
 func main() {
 	ctx := context.Background()
-	client := setup()
+	client, topicID := setup()
+	subscriptionID := topicID
 	defer client.Close()
 
 	topic, err := client.CreateTopicWithConfig(ctx, topicID, &pubsub.TopicConfig{
